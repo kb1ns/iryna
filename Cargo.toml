@@ -1,0 +1,8 @@
+[package]
+name = "iryna"
+version = "0.1.0"
+authors = ["archerfeel <archerfeel@gmail.com>"]
+
+[dependencies]
+mio = "0.6"
+concurrent-hashmap = "0.2.1"
