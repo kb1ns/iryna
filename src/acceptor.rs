@@ -59,9 +59,7 @@ impl Acceptor {
         };
         let ip_addr = self.host.parse().unwrap();
         let sock_addr = Arc::new(SocketAddr::new(ip_addr, self.port));
-        let count = Arc::new(self.eventloop_count);
-        let const_count = Arc::clone(&count);
-        //FIXME magic?
+        let const_count = self.eventloop_count;
         let f = self.func;
         thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
@@ -72,7 +70,6 @@ impl Acceptor {
                 .register(&listener, Token(0), Ready::readable(), PollOpt::edge())
                 .unwrap();
             //TODO processor * 2
-            let const_count = Arc::try_unwrap(const_count).unwrap_or(1);
             for eventloop in group.iter() {
                 eventloop.run();
             }
