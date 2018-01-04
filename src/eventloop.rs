@@ -2,9 +2,8 @@ use std::time::Duration;
 //use std::collections::HashMap;
 use concurrent_hashmap::*;
 use std::net::SocketAddr;
-use std::io::Read;
+use std::io::{Read, Result};
 use std::thread;
-use std::rc::Rc;
 use std::sync::Arc;
 use mio::*;
 use mio::net::TcpStream;
@@ -23,13 +22,10 @@ impl EventLoop {
         }
     }
 
-    pub fn attach(&self, tcp: &mut TcpStream, addr: &SocketAddr, id: Token) {
-        //TODO thread safe
-        let channel = Channel::create(tcp, addr, id);
-        //
-        channel.register(&self.selector);
-        //
-        self.channels.insert(id, channel);
+    pub fn attach(&self, sock: &mut TcpStream, addr: &SocketAddr, token: Token, func: Option<fn(&mut Channel)->Result<()>>) {
+        let ch = Channel::create(sock, addr, token, func);
+        ch.register(&self.selector);
+        self.channels.insert(token, ch);
     }
 
     pub fn run(&self) {
@@ -44,7 +40,10 @@ impl EventLoop {
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
                     if let Some(mut ch) = channels.find_mut(&e.token()) {
-                        println!("{}", ch.get().remote_addr);
+                        match ch.get().func {
+                            None => {},
+                            Some(f) => {f(&mut ch.get());}
+                        }
                     } else {
                         //TODO
                     }

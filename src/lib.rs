@@ -9,21 +9,23 @@ extern crate mio;
 #[cfg(test)]
 mod tests {
 
-    use std::io::Write;
-    use mio::*;
-    use mio::net::{TcpListener, TcpStream};
     use std;
-    use std::collections::HashMap;
-    use std::fs::OpenOptions;
+    use std::io::Write;
+    use std::io::Result;
     use eventloop::*;
     use channel::*;
     use acceptor::*;
 
     #[test]
     fn it_works() {
-
-        Acceptor::new().worker_count(4).bind("127.0.0.1", 12345).accept();
-
+        Acceptor::new().worker_count(4).bind("127.0.0.1", 12345)
+            .handler(test)
+            .accept();
         std::thread::sleep_ms(100000);
+    }
+
+    fn test(ch: &mut Channel) -> Result<()> {
+        ch.write("Hello, world.\n".as_bytes());
+        Ok(())
     }
 }
