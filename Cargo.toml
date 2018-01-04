@@ -2,6 +2,8 @@
 name = "iryna"
 version = "0.1.0"
 authors = ["archerfeel <archerfeel@gmail.com>"]
+description = "A work-in-progress networking library."
+license = "MIT"
 
 [dependencies]
 mio = "0.6"
