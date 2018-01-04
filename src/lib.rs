@@ -1,6 +1,7 @@
 #![feature(match_default_bindings)]
 mod eventloop;
 mod channel;
+mod acceptor;
 
 extern crate concurrent_hashmap;
 extern crate mio;
@@ -11,7 +12,8 @@ mod tests {
     use std::io::Write;
     use mio::*;
     use mio::net::{TcpListener, TcpStream};
-
+    use std::collections::HashMap;
+    use std::fs::OpenOptions;
     use eventloop::*;
     use channel::*;
 

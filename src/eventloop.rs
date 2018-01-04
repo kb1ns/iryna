@@ -33,6 +33,7 @@ impl EventLoop {
     }
 
     pub fn run(&self) {
+        //FIXME is this thread safe?
         let channels_copy = Arc::clone(&self.channels);
         let selector_copy = Arc::clone(&self.selector);
         thread::spawn(move || {
