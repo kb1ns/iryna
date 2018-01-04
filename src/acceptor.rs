@@ -1,17 +1,19 @@
 use std::thread;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::net::{IpAddr, SocketAddr};
+use std::io::Result;
 use mio::*;
 use mio::net::{TcpListener, TcpStream};
 use eventloop::*;
+use channel::*;
 
 
 pub struct Acceptor {
     host: String,
     port: u16,
-    selector: Arc<Poll>,
-    eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    listener: Option<Arc<TcpListener>>,
+    eventloop_group: Arc<RwLock<Vec<EventLoop>>>,
+    handler: Option<fn(&Channel) -> Result<()>>,
+    eventloop_count: usize,
 }
 
 impl Acceptor {
@@ -19,59 +21,67 @@ impl Acceptor {
         Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
-            selector: Arc::new(Poll::new().unwrap()),
-            eventloop_group: None,
-            listener: None,
+            eventloop_group: Arc::new(RwLock::new(Vec::new())),
+            handler: None,
+            eventloop_count: 0,
         }
     }
 
-    pub fn worker_count(&mut self, size: u8) -> &mut Acceptor {
-        //FIXME
-        let mut group = Vec::<EventLoop>::new();
-        for i in 0..size {
-            let eventloop = EventLoop::new();
-            eventloop.run();
-            group.push(eventloop);
-        }
-        self.eventloop_group = Some(Arc::new(group));
+    pub fn worker_count(&mut self, size: usize) -> &mut Acceptor {
+        self.eventloop_count = size;
+        self
+    }
+
+    pub fn handler(&mut self, f: fn(&Channel) -> Result<()>) -> &mut Acceptor {
+        self.handler = Some(f);
         self
     }
 
     pub fn bind(&mut self, host: &str, port: u16) -> &mut Acceptor {
-        //TODO error
-        let ip_addr = host.parse().unwrap();
-        let sock_addr = SocketAddr::new(ip_addr, port);
-        let l = TcpListener::bind(&sock_addr).unwrap();
         self.host = host.to_string();
         self.port = port;
-        let selector = Arc::clone(&self.selector);
-        selector
-            .register(&l, Token(0), Ready::readable(), PollOpt::edge())
-            .unwrap();
-        self.listener = Some(Arc::new(l));
         self
     }
 
+    pub fn shutdown(&self) {
+        //need ref of eventloop_group
+    }
+
     pub fn accept(&self) {
-        let selector = Arc::clone(&self.selector);
-        let listener = match &self.listener {
-            None => panic!("No socket address to bind."),
-            Some(l) => Arc::clone(&l),
-        };
-        let eventloop_group = match &self.eventloop_group {
-            None => panic!(""),
-            Some(g) => Arc::clone(&g),
-        };
+        let group = Arc::clone(&self.eventloop_group);
+        let ip_addr = self.host.parse().unwrap();
+        let sock_addr = Arc::new(SocketAddr::new(ip_addr, self.port));
+        let count = Arc::new(self.eventloop_count);
+        let const_count = Arc::clone(&count);
         thread::spawn(move || {
-            //TODO
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 0;
+            let listener = TcpListener::bind(&sock_addr).unwrap();
+            let selector = Poll::new().unwrap();
+            selector.register(&listener, Token(0), Ready::readable(), PollOpt::edge()).unwrap();
+            //TODO processor * 2
+            let const_count = Arc::try_unwrap(const_count).unwrap_or(1);
+            //FIXME no necessary lock
+            for _i in 0..const_count {
+                let eventloop = EventLoop::new();
+                eventloop.run();
+                let mut g = group.write().unwrap();
+                g.push(eventloop);
+            }
             loop {
-                selector.poll(&mut events, None).unwrap();
-                for e in events.iter() {
-                    let (mut sock, addr) = listener.accept().unwrap();
-                    //TODO
-                    eventloop_group[0].attach(&mut sock, &addr, Token(ch_id));
+                match selector.poll(&mut events, None) {
+                    Ok(_) => {},
+                    Err(_) => {},
+                }
+                for _e in events.iter() {
+                    let (mut sock, addr) = match listener.accept() {
+                        Ok((s, a)) => (s, a),
+                        Err(_) => {
+                            continue;
+                        }
+                    };
+                    let g = group.read().unwrap();
+                    g[ch_id % const_count].attach(&mut sock, &addr, Token(ch_id));
                     ch_id = Acceptor::incr_id(ch_id);
                 }
             }
