@@ -25,7 +25,7 @@ impl EventLoop {
 
     pub fn attach(&self, tcp: &mut TcpStream, addr: &SocketAddr, id: Token) {
         //TODO thread safe
-        let mut channel = Channel::create(tcp, addr, id);
+        let channel = Channel::create(tcp, addr, id);
         //
         channel.register(&self.selector);
         //
@@ -34,18 +34,16 @@ impl EventLoop {
 
     pub fn run(&self) {
         //FIXME is this thread safe?
-        let channels_copy = Arc::clone(&self.channels);
-        let selector_copy = Arc::clone(&self.selector);
+        let channels = Arc::clone(&self.channels);
+        let selector = Arc::clone(&self.selector);
         thread::spawn(move || {
             //TODO capacity
             let mut events = Events::with_capacity(1024);
             loop {
                 //TODO timeout Duration::from_millis(500);
-
-                selector_copy.poll(&mut events, None).unwrap();
-
+                selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
-                    if let Some(mut ch) = channels_copy.find_mut(&e.token()) {
+                    if let Some(mut ch) = channels.find_mut(&e.token()) {
                         println!("{}", ch.get().remote_addr);
                     } else {
                         //TODO
