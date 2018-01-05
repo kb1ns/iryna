@@ -38,11 +38,27 @@ impl Acceptor {
         self
     }
 
-    pub fn handler(
+    pub fn on_active(
+        &mut self,
+        p: Box<Fn(&mut TcpStream, &SocketAddr) -> Result<()> + Send + Sync>,
+    ) -> &mut Acceptor {
+
+        self
+    }
+
+    pub fn on_receive(
         &mut self,
         p: Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>,
     ) -> &mut Acceptor {
         self.processor = Some(Arc::new(p));
+        self
+    }
+
+    pub fn on_close(
+        &mut self,
+        p: Box<Fn(&SocketAddr) -> Result<()> + Send + Sync>,
+    ) -> &mut Acceptor {
+
         self
     }
 
@@ -52,7 +68,7 @@ impl Acceptor {
         self
     }
 
-    pub fn shutdown(&self) {
+    pub fn terminate(&mut self) {
         //need ref of eventloop_group
     }
 
@@ -76,7 +92,6 @@ impl Acceptor {
             selector
                 .register(&listener, Token(0), Ready::readable(), PollOpt::edge())
                 .unwrap();
-            //TODO processor * 2
             for eventloop in group.iter() {
                 eventloop.run();
             }

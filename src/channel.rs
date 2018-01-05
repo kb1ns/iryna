@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use mio::*;
 use mio::net::TcpStream;
 
+
 pub struct Channel {
     pub channel_id: Token,
     pub remote_addr: SocketAddr,
