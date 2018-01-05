@@ -1,51 +1,58 @@
 use std::time::Duration;
-//use std::collections::HashMap;
+use std::collections::HashMap;
 use concurrent_hashmap::*;
 use std::net::SocketAddr;
 use std::io::{Read, Result};
 use std::thread;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::ops::Deref;
 use mio::*;
 use mio::net::TcpStream;
-use channel::Channel;
+use channel::*;
 
 pub struct EventLoop {
     selector: Arc<Poll>,
-    channels: Arc<ConcHashMap<Token, Channel>>,
+    channels: Arc<RwLock<HashMap<Token, Channel>>>,
 }
 
 impl EventLoop {
     pub fn new() -> EventLoop {
         EventLoop {
             selector: Arc::new(Poll::new().unwrap()),
-            channels: Arc::new(ConcHashMap::<Token, Channel>::new()),
+            channels: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub fn attach(&self, sock: &mut TcpStream, addr: &SocketAddr, token: Token, func: Option<fn(&mut Channel)->Result<()>>) {
-        let ch = Channel::create(sock, addr, token, func);
+    pub fn attach(
+        &self,
+        sock: &mut TcpStream,
+        addr: &SocketAddr,
+        token: Token,
+        handler: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
+    ) {
+        let ch = Channel::create(sock, addr, token, handler);
         ch.register(&self.selector);
-        self.channels.insert(token, ch);
+        let mut channels = self.channels.write().unwrap();
+        channels.insert(token, ch);
     }
 
     pub fn run(&self) {
-        //FIXME is this thread safe?
-        let channels = Arc::clone(&self.channels);
         let selector = Arc::clone(&self.selector);
+        let channels = Arc::clone(&self.channels);
         thread::spawn(move || {
-            //TODO capacity
             let mut events = Events::with_capacity(1024);
             loop {
-                //TODO timeout Duration::from_millis(500);
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
-                    if let Some(mut ch) = channels.find_mut(&e.token()) {
-                        match ch.get().func {
-                            None => {},
-                            Some(f) => {f(&mut ch.get());}
-                        }
-                    } else {
-                        //TODO
+                    let mut channels_lock = channels.write().unwrap();
+                    if let Some(mut ch) = channels_lock.get_mut(&e.token()) {
+                        let closure = match &ch.handler {
+                            Some(ref h) => h,
+                            None => {
+                                continue;
+                            }
+                        };
+                        (*&mut closure)(&mut ch);
                     }
                 }
             }

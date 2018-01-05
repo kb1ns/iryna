@@ -1,4 +1,5 @@
 use std::thread;
+use std::clone::Clone;
 use std::sync::{Arc, Mutex, RwLock};
 use std::net::{IpAddr, SocketAddr};
 use std::io::Result;
@@ -12,7 +13,7 @@ pub struct Acceptor {
     host: String,
     port: u16,
     eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    func: Option<fn(&mut Channel) -> Result<()>>,
+    processor: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
     eventloop_count: usize,
 }
 
@@ -22,7 +23,7 @@ impl Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
             eventloop_group: None,
-            func: None,
+            processor: None,
             eventloop_count: 0,
         }
     }
@@ -37,8 +38,11 @@ impl Acceptor {
         self
     }
 
-    pub fn handler(&mut self, f: fn(&mut Channel) -> Result<()>) -> &mut Acceptor {
-        self.func = Some(f);
+    pub fn handler(
+        &mut self,
+        p: Box<FnMut(&Channel) -> Result<()> + Send + Sync>,
+    ) -> &mut Acceptor {
+        self.processor = Some(Arc::new(p));
         self
     }
 
@@ -60,7 +64,10 @@ impl Acceptor {
         let ip_addr = self.host.parse().unwrap();
         let sock_addr = Arc::new(SocketAddr::new(ip_addr, self.port));
         let const_count = self.eventloop_count;
-        let f = self.func;
+        let f = match &self.processor {
+            None => panic!(""),
+            Some(p) => Arc::clone(&p),
+        };
         thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 0;
@@ -85,7 +92,7 @@ impl Acceptor {
                             continue;
                         }
                     };
-                    group[ch_id % const_count].attach(&mut sock, &addr, Token(ch_id), f);
+                    group[ch_id % const_count].attach(&mut sock, &addr, Token(ch_id), Some(Arc::clone(&f)));
                     ch_id = Acceptor::incr_id(ch_id);
                 }
             }

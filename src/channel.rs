@@ -1,4 +1,5 @@
 use std::io::{Read, Write, Result};
+use std::sync::Arc;
 use std::net::SocketAddr;
 use mio::*;
 use mio::net::TcpStream;
@@ -6,18 +7,23 @@ use mio::net::TcpStream;
 pub struct Channel {
     pub channel_id: Token,
     pub remote_addr: SocketAddr,
+    pub handler: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
     stream: TcpStream,
-    pub func: Option<fn(&mut Channel)->Result<()>>,
 }
 
 impl Channel {
-    pub fn create(tcp: &mut TcpStream, addr: &SocketAddr, id: Token, f: Option<fn(&mut Channel)->Result<()>>) -> Channel {
+    pub fn create(
+        tcp: &mut TcpStream,
+        addr: &SocketAddr,
+        id: Token,
+        h: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
+    ) -> Channel {
         Channel {
             channel_id: id,
             remote_addr: addr.clone(),
+            handler: h,
             //TODO error handling
             stream: tcp.try_clone().unwrap(),
-            func: f,
         }
     }
 
@@ -34,3 +40,5 @@ impl Channel {
         self.stream.write(buf);
     }
 }
+
+pub struct ChannelContext;
