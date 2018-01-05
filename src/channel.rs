@@ -7,8 +7,8 @@ use mio::net::TcpStream;
 pub struct Channel {
     pub channel_id: Token,
     pub remote_addr: SocketAddr,
-    pub handler: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
-    stream: TcpStream,
+    pub handler: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+    pub stream: TcpStream,
 }
 
 impl Channel {
@@ -16,7 +16,7 @@ impl Channel {
         tcp: &mut TcpStream,
         addr: &SocketAddr,
         id: Token,
-        h: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
+        h: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
     ) -> Channel {
         Channel {
             channel_id: id,

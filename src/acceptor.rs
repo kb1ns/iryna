@@ -13,7 +13,7 @@ pub struct Acceptor {
     host: String,
     port: u16,
     eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    processor: Option<Arc<Box<FnMut(&Channel) -> Result<()> + Send + Sync>>>,
+    processor: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
     eventloop_count: usize,
 }
 
@@ -40,7 +40,7 @@ impl Acceptor {
 
     pub fn handler(
         &mut self,
-        p: Box<FnMut(&Channel) -> Result<()> + Send + Sync>,
+        p: Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>,
     ) -> &mut Acceptor {
         self.processor = Some(Arc::new(p));
         self
@@ -92,7 +92,12 @@ impl Acceptor {
                             continue;
                         }
                     };
-                    group[ch_id % const_count].attach(&mut sock, &addr, Token(ch_id), Some(Arc::clone(&f)));
+                    group[ch_id % const_count].attach(
+                        &mut sock,
+                        &addr,
+                        Token(ch_id),
+                        Some(Arc::clone(&f)),
+                    );
                     ch_id = Acceptor::incr_id(ch_id);
                 }
             }

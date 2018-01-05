@@ -18,17 +18,14 @@ mod tests {
 
     #[test]
     fn it_works() {
-        Acceptor::new().worker_count(4).bind("127.0.0.1", 12345)
-            .handler(&|ch| {
+        Acceptor::new()
+            .worker_count(4)
+            .bind("127.0.0.1", 12345)
+            .handler(Box::new(|ref mut ch| {
                 ch.write("Hello, world.\n".as_bytes());
                 Ok(())
-            })
+            }))
             .accept();
         std::thread::sleep_ms(100000);
-    }
-
-    fn test(ch: &mut Channel) -> Result<()> {
-        ch.write("Hello, world.\n".as_bytes());
-        Ok(())
     }
 }
