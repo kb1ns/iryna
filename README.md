@@ -1,6 +1,6 @@
 ## Iryna
 
-![https://crates.io/crates/iryna](https://img.shields.io/crates/v/iryna.svg)
+[![crates](https://img.shields.io/crates/v/iryna.svg)](https://crates.io/crates/iryna)
 
 - work in progress
 - for learning rust
