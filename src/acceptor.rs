@@ -13,7 +13,7 @@ pub struct Acceptor {
     host: String,
     port: u16,
     eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    processor: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+    handler: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
     eventloop_count: usize,
 }
 
@@ -23,7 +23,7 @@ impl Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
             eventloop_group: None,
-            processor: None,
+            handler: None,
             eventloop_count: 0,
         }
     }
@@ -50,7 +50,7 @@ impl Acceptor {
         &mut self,
         p: Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>,
     ) -> &mut Acceptor {
-        self.processor = Some(Arc::new(p));
+        self.handler = Some(Arc::new(p));
         self
     }
 
@@ -80,7 +80,7 @@ impl Acceptor {
         let ip_addr = self.host.parse().unwrap();
         let sock_addr = Arc::new(SocketAddr::new(ip_addr, self.port));
         let const_count = self.eventloop_count;
-        let f = match &self.processor {
+        let f = match &self.handler {
             None => panic!(""),
             Some(p) => Arc::clone(&p),
         };
