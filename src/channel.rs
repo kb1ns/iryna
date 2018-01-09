@@ -1,14 +1,18 @@
-use std::io::{Read, Write, Result};
+use std::io::{Read, Result, Write};
 use std::sync::Arc;
 use std::net::SocketAddr;
 use mio::*;
 use mio::net::TcpStream;
+use acceptor::*;
 
+pub type Closure = Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>;
 
 pub struct Channel {
     pub channel_id: Token,
     pub remote_addr: SocketAddr,
-    pub handler: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+    pub receive_handler: Arc<Closure>,
+    pub ready_handler: Arc<Closure>,
+    pub close_handler: Arc<Closure>,
     pub stream: TcpStream,
 }
 
@@ -17,12 +21,16 @@ impl Channel {
         tcp: &mut TcpStream,
         addr: &SocketAddr,
         id: Token,
-        h: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+        ready: Arc<Closure>,
+        receive: Arc<Closure>,
+        close: Arc<Closure>,
     ) -> Channel {
         Channel {
             channel_id: id,
             remote_addr: addr.clone(),
-            handler: h,
+            ready_handler: ready,
+            receive_handler: receive,
+            close_handler: close,
             //TODO error handling
             stream: tcp.try_clone().unwrap(),
         }
@@ -35,10 +43,6 @@ impl Channel {
             Ready::readable(),
             PollOpt::edge(),
         );
-    }
-
-    pub fn write(&mut self, buf: &[u8]) {
-        self.stream.write(buf);
     }
 }
 

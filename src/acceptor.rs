@@ -2,33 +2,45 @@ use std::thread;
 use std::clone::Clone;
 use std::sync::{Arc, Mutex, RwLock};
 use std::net::{IpAddr, SocketAddr};
-use std::io::Result;
+use std::io::{Result, Write};
 use mio::*;
 use mio::net::{TcpListener, TcpStream};
 use eventloop::*;
 use channel::*;
 
-
 pub struct Acceptor {
     host: String,
     port: u16,
     eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    handler: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+    receive_handler: Arc<Closure>,
+    ready_handler: Arc<Closure>,
+    close_handler: Arc<Closure>,
     eventloop_count: usize,
 }
 
 impl Acceptor {
-    pub fn new() -> Acceptor {
+    pub fn new() -> Self {
         Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
             eventloop_group: None,
-            handler: None,
+            receive_handler: Arc::new(Box::new(|ref mut ch| {
+                ch.write("Hello, world.\n".as_bytes());
+                Ok(())
+            })),
+            ready_handler: Arc::new(Box::new(|ref mut ch| {
+                ch.write("Welcome\n".as_bytes());
+                Ok(())
+            })),
+            close_handler: Arc::new(Box::new(|ref mut ch| {
+                ch.write("Bye\n".as_bytes());
+                Ok(())
+            })),
             eventloop_count: 0,
         }
     }
 
-    pub fn worker_count(&mut self, size: usize) -> &mut Acceptor {
+    pub fn worker_count(&mut self, size: usize) -> &mut Self {
         self.eventloop_count = size;
         let mut group = Vec::<EventLoop>::new();
         for _i in 0..size {
@@ -38,31 +50,31 @@ impl Acceptor {
         self
     }
 
-    pub fn on_active(
-        &mut self,
-        p: Box<Fn(&mut TcpStream, &SocketAddr) -> Result<()> + Send + Sync>,
-    ) -> &mut Acceptor {
-
+    pub fn on_ready<T>(&mut self, p: T) -> &mut Self
+    where
+        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+    {
+        self.close_handler = Arc::new(Box::new(p));
         self
     }
 
-    pub fn on_receive(
-        &mut self,
-        p: Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>,
-    ) -> &mut Acceptor {
-        self.handler = Some(Arc::new(p));
+    pub fn on_receive<T>(&mut self, p: T) -> &mut Self
+    where
+        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+    {
+        self.receive_handler = Arc::new(Box::new(p));
         self
     }
 
-    pub fn on_close(
-        &mut self,
-        p: Box<Fn(&SocketAddr) -> Result<()> + Send + Sync>,
-    ) -> &mut Acceptor {
-
+    pub fn on_close<T>(&mut self, p: T) -> &mut Self
+    where
+        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+    {
+        self.close_handler = Arc::new(Box::new(p));
         self
     }
 
-    pub fn bind(&mut self, host: &str, port: u16) -> &mut Acceptor {
+    pub fn bind(&mut self, host: &str, port: u16) -> &mut Self {
         self.host = host.to_string();
         self.port = port;
         self
@@ -80,13 +92,12 @@ impl Acceptor {
         let ip_addr = self.host.parse().unwrap();
         let sock_addr = Arc::new(SocketAddr::new(ip_addr, self.port));
         let const_count = self.eventloop_count;
-        let f = match &self.handler {
-            None => panic!(""),
-            Some(p) => Arc::clone(&p),
-        };
+        let receive_handler = Arc::clone(&self.receive_handler);
+        let ready_handler = Arc::clone(&self.ready_handler);
+        let close_handler = Arc::clone(&self.close_handler);
         thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
-            let mut ch_id: usize = 0;
+            let mut ch_id: usize = 1;
             let listener = TcpListener::bind(&sock_addr).unwrap();
             let selector = Poll::new().unwrap();
             selector
@@ -111,7 +122,9 @@ impl Acceptor {
                         &mut sock,
                         &addr,
                         Token(ch_id),
-                        Some(Arc::clone(&f)),
+                        Arc::clone(&ready_handler),
+                        Arc::clone(&receive_handler),
+                        Arc::clone(&close_handler),
                     );
                     ch_id = Acceptor::incr_id(ch_id);
                 }

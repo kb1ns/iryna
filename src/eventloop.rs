@@ -1,6 +1,5 @@
 use std::time::Duration;
 use std::collections::HashMap;
-use concurrent_hashmap::*;
 use std::net::SocketAddr;
 use std::io::{Read, Result, Write};
 use std::thread;
@@ -28,10 +27,23 @@ impl EventLoop {
         sock: &mut TcpStream,
         addr: &SocketAddr,
         token: Token,
-        handler: Option<Arc<Box<Fn(&mut TcpStream) -> Result<()> + Send + Sync>>>,
+        ready_handler: Arc<Closure>,
+        receive_handler: Arc<Closure>,
+        close_handler: Arc<Closure>,
     ) {
-        let ch = Channel::create(sock, addr, token, handler);
+        let ch = Channel::create(
+            sock,
+            addr,
+            token,
+            ready_handler,
+            receive_handler,
+            close_handler,
+        );
         ch.register(&self.selector);
+        {
+            let on_ready = &ch.ready_handler;
+            on_ready(sock);
+        }
         let mut channels = self.channels.write().unwrap();
         channels.insert(token, ch);
     }
@@ -46,13 +58,8 @@ impl EventLoop {
                 for e in events.iter() {
                     let mut channels_lock = channels.write().unwrap();
                     if let Some(mut ch) = channels_lock.get_mut(&e.token()) {
-                        let mut closure = match &mut ch.handler {
-                            Some(ref mut h) => h,
-                            None => {
-                                continue;
-                            }
-                        };
-                        closure(&mut ch.stream);
+                        let on_receive = &mut ch.receive_handler;
+                        on_receive(&mut ch.stream);
                     }
                 }
             }
