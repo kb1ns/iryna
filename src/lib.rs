@@ -11,8 +11,6 @@ mod tests {
 
     use std;
     use std::io::Write;
-    use std::io::Result;
-    use eventloop::*;
     use channel::*;
     use acceptor::*;
 

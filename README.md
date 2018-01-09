@@ -9,7 +9,6 @@
 ```
 use std;
 use std::io::Write;
-use std::io::Result;
 use eventloop::*;
 use channel::*;
 use acceptor::*;
@@ -18,10 +17,12 @@ fn main() {
     Acceptor::new()
         .worker_count(4)
         .bind("127.0.0.1", 12345)
-        .handler(Box::new(|ref mut ch| {
+        .on_receive(|ref mut ch| {
             ch.write("Hello, world.\n".as_bytes());
-            Ok(())
-        }))
+        })
+        .on_ready(|ref mut ch| {
+            ch.write("Welcome.\n".as_bytes());
+        })
         .accept();
     std::thread::sleep_ms(100000);
 }
