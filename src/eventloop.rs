@@ -31,7 +31,7 @@ impl EventLoop {
         receive_handler: Arc<Closure>,
         close_handler: Arc<Closure>,
     ) {
-        let ch = Channel::create(
+        let mut ch = Channel::create(
             sock,
             addr,
             token,
@@ -42,7 +42,7 @@ impl EventLoop {
         ch.register(&self.selector);
         {
             let on_ready = &ch.ready_handler;
-            on_ready(sock);
+            on_ready(&mut ch.ctx);
         }
         let mut channels = self.channels.write().unwrap();
         channels.insert(token, ch);
@@ -59,7 +59,7 @@ impl EventLoop {
                     let mut channels_lock = channels.write().unwrap();
                     if let Some(mut ch) = channels_lock.get_mut(&e.token()) {
                         let on_receive = &mut ch.receive_handler;
-                        on_receive(&mut ch.stream);
+                        on_receive(&mut ch.ctx);
                     }
                 }
             }

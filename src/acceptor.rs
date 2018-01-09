@@ -26,15 +26,12 @@ impl Acceptor {
             eventloop_group: None,
             receive_handler: Arc::new(Box::new(|ref mut ch| {
                 ch.write("Hello, world.\n".as_bytes());
-                Ok(())
             })),
             ready_handler: Arc::new(Box::new(|ref mut ch| {
                 ch.write("Welcome\n".as_bytes());
-                Ok(())
             })),
             close_handler: Arc::new(Box::new(|ref mut ch| {
                 ch.write("Bye\n".as_bytes());
-                Ok(())
             })),
             eventloop_count: 0,
         }
@@ -52,7 +49,7 @@ impl Acceptor {
 
     pub fn on_ready<T>(&mut self, p: T) -> &mut Self
     where
-        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+        T: Fn(&mut ChanCtx) + Send + Sync + 'static,
     {
         self.close_handler = Arc::new(Box::new(p));
         self
@@ -60,7 +57,7 @@ impl Acceptor {
 
     pub fn on_receive<T>(&mut self, p: T) -> &mut Self
     where
-        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+        T: Fn(&mut ChanCtx) + Send + Sync + 'static,
     {
         self.receive_handler = Arc::new(Box::new(p));
         self
@@ -68,7 +65,7 @@ impl Acceptor {
 
     pub fn on_close<T>(&mut self, p: T) -> &mut Self
     where
-        T: Fn(&mut TcpStream) -> Result<()> + Send + Sync + 'static,
+        T: Fn(&mut ChanCtx) + Send + Sync + 'static,
     {
         self.close_handler = Arc::new(Box::new(p));
         self
