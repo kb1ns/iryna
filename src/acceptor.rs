@@ -9,6 +9,37 @@ use mio::net::{TcpListener, TcpStream};
 use eventloop::*;
 use channel::*;
 
+/// `Acceptor` is the boss of Reactor
+///
+/// # Examples
+///
+/// An echo server demo.
+///
+/// ```
+/// extern crate iryna;
+///
+/// use std;
+/// use channel::*;
+/// use acceptor::*;
+///
+/// fn main() {
+///     Acceptor::new()
+///         .worker_count(4)
+///         .bind("127.0.0.1", 9098)
+///         .opt_nodelay(true)
+///         .opt_send_buf_size(4096)
+///         .opt_recv_buf_size(4096)
+///         .on_receive(|ref mut ch| {
+///             let s: String = ch.read_test();
+///             ch.write(s.as_bytes());
+///         })
+///         .on_ready(|ref mut ch| {
+///             ch.write("Welcome.\n".as_bytes());
+///         })
+///         .accept();
+///     std::thread::sleep_ms(100000);
+/// }
+/// ```
 pub struct Acceptor {
     host: String,
     port: u16,
@@ -40,16 +71,19 @@ impl Acceptor {
         }
     }
 
+    /// set ttl in ms
     pub fn opt_ttl_ms(&mut self, ttl: usize) -> &mut Self {
         self.opts.insert("ttl".to_owned(), OptionValue::NUMBER(ttl));
         self
     }
 
+    /// set linger in ms
     pub fn opt_linger_ms(&mut self, linger: usize) -> &mut Self {
         self.opts.insert("linger".to_owned(), OptionValue::NUMBER(linger));
         self
     }
 
+    /// set tcp nodelay
     pub fn opt_nodelay(&mut self, nodelay: bool) -> &mut Self {
         self.opts.insert("nodelay".to_owned(), OptionValue::BOOL(nodelay));
         self
@@ -70,6 +104,7 @@ impl Acceptor {
         self
     }
 
+    /// set the `EventLoop` number
     pub fn worker_count(&mut self, size: usize) -> &mut Self {
         self.eventloop_count = size;
         let mut group = Vec::<EventLoop>::new();
@@ -80,6 +115,7 @@ impl Acceptor {
         self
     }
 
+    /// after a new connection established
     pub fn on_ready<T>(&mut self, p: T) -> &mut Self
     where
         T: Fn(&mut ChanCtx) + Send + Sync + 'static,
@@ -88,6 +124,7 @@ impl Acceptor {
         self
     }
 
+    /// when new data received
     pub fn on_receive<T>(&mut self, p: T) -> &mut Self
     where
         T: Fn(&mut ChanCtx) + Send + Sync + 'static,
@@ -96,6 +133,7 @@ impl Acceptor {
         self
     }
 
+    /// when a connection closed
     pub fn on_close<T>(&mut self, p: T) -> &mut Self
     where
         T: Fn(&mut ChanCtx) + Send + Sync + 'static,
@@ -104,16 +142,19 @@ impl Acceptor {
         self
     }
 
+    /// bind address and port
     pub fn bind(&mut self, host: &str, port: u16) -> &mut Self {
         self.host = host.to_string();
         self.port = port;
         self
     }
 
+    /// *NOT IMPLEMENT YET*
     pub fn terminate(&mut self) {
         //need ref of eventloop_group
     }
 
+    /// start the server
     pub fn accept(&self) {
         let group = match &self.eventloop_group {
             None => panic!(""),
