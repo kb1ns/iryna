@@ -118,6 +118,12 @@ impl ChanCtx {
         self.chan.write_all(data)
     }
 
+    pub fn read_test(&mut self) -> String {
+        let mut s = String::new();
+        self.chan.read_to_string(&mut s);
+        s
+    }
+
     pub fn chan_id(&self) -> Token {
         self.id
     }
