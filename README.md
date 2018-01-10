@@ -2,13 +2,11 @@
 
 [![crates](https://img.shields.io/crates/v/iryna.svg)](https://crates.io/crates/iryna)
 
---- 
 - work in progress
 - based on [mio](https://github.com/carllerche/mio)
 - for learning rust
 
 ### TODO
----
 
 - channel close detect
 - shutdown server gracefully
