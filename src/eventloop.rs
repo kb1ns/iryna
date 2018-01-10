@@ -4,7 +4,6 @@ use std::net::SocketAddr;
 use std::io::{Read, Result, Write};
 use std::thread;
 use std::sync::{Arc, RwLock};
-use std::ops::Deref;
 use mio::*;
 use mio::net::TcpStream;
 use channel::*;
@@ -27,6 +26,7 @@ impl EventLoop {
         sock: &mut TcpStream,
         addr: &SocketAddr,
         token: Token,
+        opts: HashMap<String, OptionValue>,
         ready_handler: Arc<Closure>,
         receive_handler: Arc<Closure>,
         close_handler: Arc<Closure>,
@@ -35,6 +35,7 @@ impl EventLoop {
             sock,
             addr,
             token,
+            opts,
             ready_handler,
             receive_handler,
             close_handler,

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::thread;
 use std::clone::Clone;
 use std::sync::{Arc, Mutex, RwLock};
@@ -16,6 +17,7 @@ pub struct Acceptor {
     ready_handler: Arc<Closure>,
     close_handler: Arc<Closure>,
     eventloop_count: usize,
+    opts: HashMap<String, OptionValue>,
 }
 
 impl Acceptor {
@@ -34,7 +36,38 @@ impl Acceptor {
                 ch.write("Bye\n".as_bytes());
             })),
             eventloop_count: 0,
+            opts: HashMap::new(),
         }
+    }
+
+    pub fn opt_ttl_ms(&mut self, ttl: usize) -> &mut Self {
+        self.opts.insert("ttl".to_owned(), OptionValue::NUMBER(ttl));
+        self
+    }
+
+    pub fn opt_linger_ms(&mut self, linger: usize) -> &mut Self {
+        self.opts.insert("linger".to_owned(), OptionValue::NUMBER(linger));
+        self
+    }
+
+    pub fn opt_nodelay(&mut self, nodelay: bool) -> &mut Self {
+        self.opts.insert("nodelay".to_owned(), OptionValue::BOOL(nodelay));
+        self
+    }
+
+    pub fn opt_keepalive_ms(&mut self, keep_alive: usize) -> &mut Self {
+        self.opts.insert("keep_alive".to_owned(), OptionValue::NUMBER(keep_alive));
+        self
+    }
+
+    pub fn opt_recv_buf_size(&mut self, buf_size: usize) -> &mut Self {
+        self.opts.insert("recv_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self
+    }
+
+    pub fn opt_send_buf_size(&mut self, buf_size: usize) -> &mut Self {
+        self.opts.insert("send_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self
     }
 
     pub fn worker_count(&mut self, size: usize) -> &mut Self {
@@ -92,6 +125,7 @@ impl Acceptor {
         let receive_handler = Arc::clone(&self.receive_handler);
         let ready_handler = Arc::clone(&self.ready_handler);
         let close_handler = Arc::clone(&self.close_handler);
+        let opts = self.opts.clone();
         thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 1;
@@ -119,6 +153,7 @@ impl Acceptor {
                         &mut sock,
                         &addr,
                         Token(ch_id),
+                        opts.clone(),
                         Arc::clone(&ready_handler),
                         Arc::clone(&receive_handler),
                         Arc::clone(&close_handler),

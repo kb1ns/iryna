@@ -7,4 +7,5 @@ license = "MIT"
 
 [dependencies]
 mio = "0.6"
-concurrent-hashmap = "0.2.1"
+typemap = "0.3.3"
+#concurrent-hashmap = "0.2.1"
