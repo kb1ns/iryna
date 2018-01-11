@@ -21,6 +21,7 @@ mod tests {
             .opt_nodelay(true)
             .opt_send_buf_size(4096)
             .opt_recv_buf_size(4096)
+            .opt_keep_alive_ms(10000)
             .on_receive(|ref mut ch| {
                 let sbuf: String = ch.read_test();
                 match sbuf.trim_right() {
@@ -36,6 +37,6 @@ mod tests {
                 ch.write("Welcome.\n".as_bytes());
             })
             .accept();
-        std::thread::sleep_ms(100000);
+        std::thread::sleep_ms(99999999999999);
     }
 }

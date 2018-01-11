@@ -79,28 +79,33 @@ impl Acceptor {
 
     /// set linger in ms
     pub fn opt_linger_ms(&mut self, linger: usize) -> &mut Self {
-        self.opts.insert("linger".to_owned(), OptionValue::NUMBER(linger));
+        self.opts
+            .insert("linger".to_owned(), OptionValue::NUMBER(linger));
         self
     }
 
     /// set tcp nodelay
     pub fn opt_nodelay(&mut self, nodelay: bool) -> &mut Self {
-        self.opts.insert("nodelay".to_owned(), OptionValue::BOOL(nodelay));
+        self.opts
+            .insert("nodelay".to_owned(), OptionValue::BOOL(nodelay));
         self
     }
 
-    pub fn opt_keepalive_ms(&mut self, keep_alive: usize) -> &mut Self {
-        self.opts.insert("keep_alive".to_owned(), OptionValue::NUMBER(keep_alive));
+    pub fn opt_keep_alive_ms(&mut self, keep_alive: usize) -> &mut Self {
+        self.opts
+            .insert("keep_alive".to_owned(), OptionValue::NUMBER(keep_alive));
         self
     }
 
     pub fn opt_recv_buf_size(&mut self, buf_size: usize) -> &mut Self {
-        self.opts.insert("recv_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self.opts
+            .insert("recv_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
         self
     }
 
     pub fn opt_send_buf_size(&mut self, buf_size: usize) -> &mut Self {
-        self.opts.insert("send_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self.opts
+            .insert("send_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
         self
     }
 
@@ -171,17 +176,16 @@ impl Acceptor {
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 1;
             let listener = TcpListener::bind(&sock_addr).unwrap();
-            let selector = Poll::new().unwrap();
-            selector
-                .register(&listener, Token(0), Ready::readable(), PollOpt::edge())
+            let sel = Poll::new().unwrap();
+            sel.register(&listener, Token(0), Ready::readable(), PollOpt::edge())
                 .unwrap();
-            for eventloop in group.iter() {
-                eventloop.run();
-            }
+            group.iter().for_each(|e| e.run());
             loop {
-                match selector.poll(&mut events, None) {
+                match sel.poll(&mut events, None) {
                     Ok(_) => {}
-                    Err(_) => {}
+                    Err(_) => {
+                        continue;
+                    }
                 }
                 for _e in events.iter() {
                     let (mut sock, addr) = match listener.accept() {

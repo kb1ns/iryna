@@ -10,8 +10,8 @@ use mio::net::TcpStream;
 use channel::*;
 
 pub struct EventLoop {
-    selector: Arc<Poll>,
-    channels: Arc<CHashMap<Token, Channel>>,
+    pub selector: Arc<Poll>,
+    pub channels: Arc<CHashMap<Token, Channel>>,
 }
 
 impl EventLoop {
@@ -41,6 +41,7 @@ impl EventLoop {
             receive_handler,
             close_handler,
             Arc::clone(&self.channels),
+            Arc::clone(&self.selector),
         );
         ch.register(&self.selector);
         {
