@@ -4,7 +4,7 @@ mod channel;
 mod acceptor;
 
 extern crate mio;
-extern crate typemap;
+extern crate chashmap;
 
 #[cfg(test)]
 mod tests {
@@ -22,8 +22,15 @@ mod tests {
             .opt_send_buf_size(4096)
             .opt_recv_buf_size(4096)
             .on_receive(|ref mut ch| {
-                let s: String = ch.read_test();
-                ch.write(s.as_bytes());
+                let sbuf: String = ch.read_test();
+                match sbuf.trim_right() {
+                    "quit" => {
+                        ch.close();
+                    }
+                    _ => {
+                        ch.write(sbuf.as_bytes());
+                    }
+                }
             })
             .on_ready(|ref mut ch| {
                 ch.write("Welcome.\n".as_bytes());

@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::io::{Read, Result, Write};
 use std::sync::Arc;
 use std::time::Duration;
-use std::net::SocketAddr;
+use std::net::{Shutdown, SocketAddr};
 use mio::*;
 use mio::net::TcpStream;
 use acceptor::*;
+use chashmap::CHashMap;
 
 pub type Closure = Box<Fn(&mut ChanCtx) + Send + Sync>;
 
@@ -31,12 +32,13 @@ impl Channel {
         ready: Arc<Closure>,
         receive: Arc<Closure>,
         close: Arc<Closure>,
+        container: Arc<CHashMap<Token, Channel>>,
     ) -> Channel {
         Channel {
             ready_handler: ready,
             receive_handler: receive,
             close_handler: close,
-            ctx: ChanCtx::new(addr, stream, id, opts),
+            ctx: ChanCtx::new(addr, stream, id, opts, container),
         }
     }
 
@@ -55,6 +57,7 @@ pub struct ChanCtx {
     chan: TcpStream,
     id: Token,
     options: HashMap<String, OptionValue>,
+    owner: Arc<CHashMap<Token, Channel>>,
 }
 
 impl ChanCtx {
@@ -63,6 +66,7 @@ impl ChanCtx {
         stream: &mut TcpStream,
         chan_id: Token,
         opts: HashMap<String, OptionValue>,
+        container: Arc<CHashMap<Token, Channel>>,
     ) -> ChanCtx {
         let ch = stream.try_clone().unwrap();
         for (k, ref v) in opts.iter() {
@@ -111,7 +115,13 @@ impl ChanCtx {
             chan: ch,
             id: chan_id,
             options: opts,
+            owner: container,
         }
+    }
+
+    pub fn close(&self) {
+        self.chan.shutdown(Shutdown::Both);
+        self.owner.remove(&self.id);
     }
 
     pub fn write(&mut self, data: &[u8]) -> Result<()> {

@@ -4,20 +4,21 @@ use std::net::SocketAddr;
 use std::io::{Read, Result, Write};
 use std::thread;
 use std::sync::{Arc, RwLock};
+use chashmap::CHashMap;
 use mio::*;
 use mio::net::TcpStream;
 use channel::*;
 
 pub struct EventLoop {
     selector: Arc<Poll>,
-    channels: Arc<RwLock<HashMap<Token, Channel>>>,
+    channels: Arc<CHashMap<Token, Channel>>,
 }
 
 impl EventLoop {
     pub fn new() -> EventLoop {
         EventLoop {
             selector: Arc::new(Poll::new().unwrap()),
-            channels: Arc::new(RwLock::new(HashMap::new())),
+            channels: Arc::new(CHashMap::new()),
         }
     }
 
@@ -39,14 +40,15 @@ impl EventLoop {
             ready_handler,
             receive_handler,
             close_handler,
+            Arc::clone(&self.channels),
         );
         ch.register(&self.selector);
         {
             let on_ready = &ch.ready_handler;
             on_ready(&mut ch.ctx);
         }
-        let mut channels = self.channels.write().unwrap();
-        channels.insert(token, ch);
+        //CAUTION
+        self.channels.insert_new(token, ch);
     }
 
     pub fn run(&self) {
@@ -57,11 +59,16 @@ impl EventLoop {
             loop {
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
-                    let mut channels_lock = channels.write().unwrap();
-                    if let Some(mut ch) = channels_lock.get_mut(&e.token()) {
-                        let on_receive = &mut ch.receive_handler;
-                        on_receive(&mut ch.ctx);
-                    }
+                    channels.alter(e.token().clone(), |op_ch| match op_ch {
+                        None => None,
+                        Some(mut ch) => {
+                            {
+                                let on_receive = &ch.receive_handler;
+                                on_receive(&mut ch.ctx);
+                            }
+                            Some(ch)
+                        }
+                    });
                 }
             }
         });

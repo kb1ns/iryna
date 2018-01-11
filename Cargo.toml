@@ -2,10 +2,9 @@
 name = "iryna"
 version = "0.1.3"
 authors = ["archerfeel <archerfeel@gmail.com>"]
-description = "A work-in-progress networking library."
+description = "A lightweight network library based on mio(work-in-progress)"
 license = "MIT"
 
 [dependencies]
 mio = "0.6"
-typemap = "0.3.3"
-#concurrent-hashmap = "0.2.1"
+chashmap = "2.2.0"
