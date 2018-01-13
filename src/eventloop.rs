@@ -41,7 +41,6 @@ impl EventLoop {
             receive_handler,
             close_handler,
             Arc::clone(&self.channels),
-            Arc::clone(&self.selector),
         );
         ch.register(&self.selector);
         {
@@ -60,16 +59,16 @@ impl EventLoop {
             loop {
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
-                    channels.alter(e.token().clone(), |op_ch| match op_ch {
-                        None => None,
-                        Some(mut ch) => {
-                            {
-                                let on_receive = &ch.receive_handler;
-                                on_receive(&mut ch.ctx);
-                            }
-                            Some(ch)
+                    if let Some(mut ch) = channels.remove(&e.token()) {
+                        {
+                            let on_receive = &ch.receive_handler;
+                            on_receive(&mut ch.ctx);
                         }
-                    });
+                        if !ch.ctx.is_closed() {
+                            //CAUTION
+                            channels.insert_new(e.token(), ch);
+                        }
+                    }
                 }
             }
         });

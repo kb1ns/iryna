@@ -34,13 +34,12 @@ impl Channel {
         receive: Arc<Closure>,
         close: Arc<Closure>,
         channels: Arc<CHashMap<Token, Channel>>,
-        selector: Arc<Poll>,
     ) -> Channel {
         Channel {
             ready_handler: ready,
             receive_handler: receive,
             close_handler: close,
-            ctx: ChanCtx::new(addr, stream, id, opts, channels, selector),
+            ctx: ChanCtx::new(addr, stream, id, opts, channels),
         }
     }
 
@@ -60,7 +59,7 @@ pub struct ChanCtx {
     id: Token,
     options: HashMap<String, OptionValue>,
     channels: Arc<CHashMap<Token, Channel>>,
-    selector: Arc<Poll>,
+    closed: bool,
 }
 
 impl ChanCtx {
@@ -70,7 +69,6 @@ impl ChanCtx {
         chan_id: Token,
         opts: HashMap<String, OptionValue>,
         channels: Arc<CHashMap<Token, Channel>>,
-        selector: Arc<Poll>,
     ) -> ChanCtx {
         let ch = stream.try_clone().unwrap();
         for (k, ref v) in opts.iter() {
@@ -120,15 +118,16 @@ impl ChanCtx {
             id: chan_id,
             options: opts,
             channels: channels,
-            selector: selector,
+            closed: false,
         }
     }
 
-    pub fn close(&self) {
-        //FIXME
-        self.selector.deregister(&self.chan);
-        self.channels.remove(&self.id);
-        self.chan.shutdown(Shutdown::Both);
+    pub fn close(&mut self) {
+        self.closed = true;
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.closed
     }
 
     pub fn write(&mut self, data: &[u8]) -> Result<()> {
@@ -142,10 +141,10 @@ impl ChanCtx {
                 self.close();
             }
             Ok(len) => {
-                println!("{}", len);
+                //               println!("{}", len);
             }
             Err(e) => {
-                println!("{}", e);
+                //                println!("{}", e);
             }
         }
         s
