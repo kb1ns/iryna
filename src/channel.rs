@@ -33,13 +33,12 @@ impl Channel {
         ready: Arc<Closure>,
         receive: Arc<Closure>,
         close: Arc<Closure>,
-        channels: Arc<CHashMap<Token, Channel>>,
     ) -> Channel {
         Channel {
             ready_handler: ready,
             receive_handler: receive,
             close_handler: close,
-            ctx: ChanCtx::new(addr, stream, id, opts, channels),
+            ctx: ChanCtx::new(addr, stream, id, opts),
         }
     }
 
@@ -58,7 +57,6 @@ pub struct ChanCtx {
     chan: TcpStream,
     id: Token,
     options: HashMap<String, OptionValue>,
-    channels: Arc<CHashMap<Token, Channel>>,
     closed: bool,
 }
 
@@ -68,7 +66,6 @@ impl ChanCtx {
         stream: &mut TcpStream,
         chan_id: Token,
         opts: HashMap<String, OptionValue>,
-        channels: Arc<CHashMap<Token, Channel>>,
     ) -> ChanCtx {
         let ch = stream.try_clone().unwrap();
         for (k, ref v) in opts.iter() {
@@ -117,7 +114,6 @@ impl ChanCtx {
             chan: ch,
             id: chan_id,
             options: opts,
-            channels: channels,
             closed: false,
         }
     }
@@ -134,20 +130,13 @@ impl ChanCtx {
         self.chan.write_all(data)
     }
 
-    pub fn read_test(&mut self) -> String {
-        let mut s = String::new();
-        match self.chan.read_to_string(&mut s) {
-            Ok(0) => {
-                self.close();
-            }
-            Ok(len) => {
-                //               println!("{}", len);
-            }
-            Err(e) => {
-                //                println!("{}", e);
-            }
-        }
-        s
+    pub fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
+        self.chan.read_exact(buf)
+    }
+
+    //TODO pri
+    pub fn check_buffer(&self, buf: &mut [u8]) -> Result<usize> {
+        self.chan.peek(buf)
     }
 
     pub fn chan_id(&self) -> Token {

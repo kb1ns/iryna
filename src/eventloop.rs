@@ -40,7 +40,6 @@ impl EventLoop {
             ready_handler,
             receive_handler,
             close_handler,
-            Arc::clone(&self.channels),
         );
         ch.register(&self.selector);
         {

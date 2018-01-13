@@ -57,15 +57,9 @@ impl Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
             eventloop_group: None,
-            receive_handler: Arc::new(Box::new(|ref mut ch| {
-                ch.write("Hello, world.\n".as_bytes());
-            })),
-            ready_handler: Arc::new(Box::new(|ref mut ch| {
-                ch.write("Welcome\n".as_bytes());
-            })),
-            close_handler: Arc::new(Box::new(|ref mut ch| {
-                ch.write("Bye\n".as_bytes());
-            })),
+            receive_handler: Arc::new(Box::new(|ref mut ch| ())),
+            ready_handler: Arc::new(Box::new(|ref mut ch| ())),
+            close_handler: Arc::new(Box::new(|ref mut ch| ())),
             eventloop_count: 0,
             opts: HashMap::new(),
         }
@@ -125,7 +119,7 @@ impl Acceptor {
     where
         T: Fn(&mut ChanCtx) + Send + Sync + 'static,
     {
-        self.close_handler = Arc::new(Box::new(p));
+        self.ready_handler = Arc::new(Box::new(p));
         self
     }
 
@@ -172,7 +166,7 @@ impl Acceptor {
         let ready_handler = Arc::clone(&self.ready_handler);
         let close_handler = Arc::clone(&self.close_handler);
         let opts = self.opts.clone();
-        thread::spawn(move || {
+        let t = thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 1;
             let listener = TcpListener::bind(&sock_addr).unwrap();
@@ -207,6 +201,7 @@ impl Acceptor {
                 }
             }
         });
+        t.join();
     }
 
     #[inline]

@@ -6,5 +6,5 @@ description = "A lightweight network library based on mio(work-in-progress)"
 license = "MIT"
 
 [dependencies]
-mio = "0.6"
+mio = "0.6.12"
 chashmap = "2.2.0"
