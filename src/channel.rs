@@ -11,6 +11,8 @@ use chashmap::CHashMap;
 
 pub type Closure = Box<Fn(&mut ChanCtx) + Send + Sync>;
 
+pub type Receiver = Box<Fn(&mut ChanCtx, Vec<u8>) + Send + Sync>;
+
 #[derive(Clone)]
 pub enum OptionValue {
     NUMBER(usize),
@@ -18,7 +20,7 @@ pub enum OptionValue {
 }
 
 pub struct Channel {
-    pub receive_handler: Arc<Closure>,
+    pub receive_handler: Arc<Receiver>,
     pub ready_handler: Arc<Closure>,
     pub close_handler: Arc<Closure>,
     pub ctx: ChanCtx,
@@ -31,7 +33,7 @@ impl Channel {
         id: Token,
         opts: HashMap<String, OptionValue>,
         ready: Arc<Closure>,
-        receive: Arc<Closure>,
+        receive: Arc<Receiver>,
         close: Arc<Closure>,
     ) -> Channel {
         Channel {
@@ -130,13 +132,9 @@ impl ChanCtx {
         self.chan.write_all(data)
     }
 
-    pub fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
-        self.chan.read_exact(buf)
-    }
-
-    //TODO pri
-    pub fn check_buffer(&self, buf: &mut [u8]) -> Result<usize> {
-        self.chan.peek(buf)
+    //TODO change to private method
+    pub fn read(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
+        self.chan.read_to_end(buf)
     }
 
     pub fn chan_id(&self) -> Token {

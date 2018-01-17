@@ -44,7 +44,7 @@ pub struct Acceptor {
     host: String,
     port: u16,
     eventloop_group: Option<Arc<Vec<EventLoop>>>,
-    receive_handler: Arc<Closure>,
+    receive_handler: Arc<Receiver>,
     ready_handler: Arc<Closure>,
     close_handler: Arc<Closure>,
     eventloop_count: usize,
@@ -57,7 +57,7 @@ impl Acceptor {
             host: "0.0.0.0".to_owned(),
             port: 12345,
             eventloop_group: None,
-            receive_handler: Arc::new(Box::new(|ref mut ch| ())),
+            receive_handler: Arc::new(Box::new(|ref mut ch, buf| ())),
             ready_handler: Arc::new(Box::new(|ref mut ch| ())),
             close_handler: Arc::new(Box::new(|ref mut ch| ())),
             eventloop_count: 0,
@@ -126,7 +126,7 @@ impl Acceptor {
     /// when new data received
     pub fn on_receive<T>(&mut self, p: T) -> &mut Self
     where
-        T: Fn(&mut ChanCtx) + Send + Sync + 'static,
+        T: Fn(&mut ChanCtx, Vec<u8>) + Send + Sync + 'static,
     {
         self.receive_handler = Arc::new(Box::new(p));
         self

@@ -29,7 +29,7 @@ impl EventLoop {
         token: Token,
         opts: HashMap<String, OptionValue>,
         ready_handler: Arc<Closure>,
-        receive_handler: Arc<Closure>,
+        receive_handler: Arc<Receiver>,
         close_handler: Arc<Closure>,
     ) {
         let mut ch = Channel::create(
@@ -60,11 +60,28 @@ impl EventLoop {
                 for e in events.iter() {
                     if let Some(mut ch) = channels.remove(&e.token()) {
                         {
-                            let on_receive = &ch.receive_handler;
-                            on_receive(&mut ch.ctx);
+                            //TODO the same with user-config
+                            let mut buf: Vec<u8> = Vec::with_capacity(4096);
+                            match ch.ctx.read(&mut buf) {
+                                Ok(0) => {
+                                    println!("close by remote peer.");
+                                    ch.ctx.close();
+                                }
+                                Ok(n) => {
+                                }
+                                Err(e) => {
+                                }
+                            }
+                            if !ch.ctx.is_closed() {
+                                let on_receive = &ch.receive_handler;
+                                on_receive(&mut ch.ctx, buf);
+                            } else {
+                                let on_close = &ch.close_handler;
+                                on_close(&mut ch.ctx);
+                            }
                         }
                         if !ch.ctx.is_closed() {
-                            //CAUTION
+                            //TODO CAUTION
                             channels.insert_new(e.token(), ch);
                         }
                     }
