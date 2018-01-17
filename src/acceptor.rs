@@ -188,7 +188,7 @@ impl Acceptor {
                             continue;
                         }
                     };
-                    group[ch_id % const_count].attach(
+                    let ch = Channel::create(
                         &mut sock,
                         &addr,
                         Token(ch_id),
@@ -197,6 +197,7 @@ impl Acceptor {
                         Arc::clone(&receive_handler),
                         Arc::clone(&close_handler),
                     );
+                    group[ch_id % const_count].attach(ch_id, ch);
                     ch_id = Acceptor::incr_id(ch_id);
                 }
             }

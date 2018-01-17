@@ -1,6 +1,6 @@
 [package]
 name = "iryna"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["archerfeel <archerfeel@gmail.com>"]
 description = "A lightweight network library based on mio(work-in-progress)"
 license = "MIT"

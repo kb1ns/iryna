@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use std::io::{Read, Result, Write};
 use std::thread;
 use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 use chashmap::CHashMap;
 use mio::*;
 use mio::net::TcpStream;
@@ -12,6 +13,7 @@ use channel::*;
 pub struct EventLoop {
     pub selector: Arc<Poll>,
     pub channels: Arc<CHashMap<Token, Channel>>,
+    stopped: Arc<AtomicBool>,
 }
 
 impl EventLoop {
@@ -19,43 +21,31 @@ impl EventLoop {
         EventLoop {
             selector: Arc::new(Poll::new().unwrap()),
             channels: Arc::new(CHashMap::new()),
+            stopped: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn attach(
-        &self,
-        sock: &mut TcpStream,
-        addr: &SocketAddr,
-        token: Token,
-        opts: HashMap<String, OptionValue>,
-        ready_handler: Arc<Closure>,
-        receive_handler: Arc<Receiver>,
-        close_handler: Arc<Closure>,
-    ) {
-        let mut ch = Channel::create(
-            sock,
-            addr,
-            token,
-            opts,
-            ready_handler,
-            receive_handler,
-            close_handler,
-        );
-        ch.register(&self.selector);
+    pub fn attach(&self, id: usize, ch: Channel) {
+        let mut channel = ch;
+        channel.register(&self.selector);
         {
-            let on_ready = &ch.ready_handler;
-            on_ready(&mut ch.ctx);
+            let on_ready = &channel.ready_handler;
+            on_ready(&mut channel.ctx);
         }
-        //CAUTION
-        self.channels.insert_new(token, ch);
+        self.channels.insert_new(Token(id), channel);
+    }
+
+    pub fn shutdown(&self) {
+        self.stopped.store(true, Ordering::Relaxed);
     }
 
     pub fn run(&self) {
         let selector = Arc::clone(&self.selector);
         let channels = Arc::clone(&self.channels);
+        let stopped = Arc::clone(&self.stopped);
         thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
-            loop {
+            while !stopped.load(Ordering::Relaxed) {
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
                     if let Some(mut ch) = channels.remove(&e.token()) {
