@@ -15,8 +15,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        Acceptor::new()
-            .worker_count(4)
+        let mut boot = Acceptor::new();
+        boot.worker_count(4)
             .bind("127.0.0.1", 9098)
             .opt_nodelay(true)
             .opt_send_buf_size(4096)
@@ -33,9 +33,7 @@ mod tests {
                     }
                 }
             })
-            .on_ready(|ref mut ch| {
-                ch.write("Welcome.\n".as_bytes());
-            })
+            .on_ready(|ref mut ch| { ch.write("Welcome.\n".as_bytes()); })
             .accept();
     }
 }

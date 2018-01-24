@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::thread;
 use std::clone::Clone;
 use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::net::{IpAddr, SocketAddr};
 use std::io::{Result, Write};
 use mio::*;
@@ -16,29 +17,7 @@ use channel::*;
 /// An echo server demo.
 ///
 /// ```
-/// extern crate iryna;
 ///
-/// use std;
-/// use channel::*;
-/// use acceptor::*;
-///
-/// fn main() {
-///     Acceptor::new()
-///         .worker_count(4)
-///         .bind("127.0.0.1", 9098)
-///         .opt_nodelay(true)
-///         .opt_send_buf_size(4096)
-///         .opt_recv_buf_size(4096)
-///         .on_receive(|ref mut ch| {
-///             let s: String = ch.read_test();
-///             ch.write(s.as_bytes());
-///         })
-///         .on_ready(|ref mut ch| {
-///             ch.write("Welcome.\n".as_bytes());
-///         })
-///         .accept();
-///     std::thread::sleep_ms(100000);
-/// }
 /// ```
 pub struct Acceptor {
     host: String,
@@ -49,6 +28,7 @@ pub struct Acceptor {
     close_handler: Arc<Closure>,
     eventloop_count: usize,
     opts: HashMap<String, OptionValue>,
+    stopped: Arc<AtomicBool>,
 }
 
 impl Acceptor {
@@ -62,6 +42,7 @@ impl Acceptor {
             close_handler: Arc::new(Box::new(|ref mut ch| ())),
             eventloop_count: 0,
             opts: HashMap::new(),
+            stopped: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -73,33 +54,43 @@ impl Acceptor {
 
     /// set linger in ms
     pub fn opt_linger_ms(&mut self, linger: usize) -> &mut Self {
-        self.opts
-            .insert("linger".to_owned(), OptionValue::NUMBER(linger));
+        self.opts.insert(
+            "linger".to_owned(),
+            OptionValue::NUMBER(linger),
+        );
         self
     }
 
     /// set tcp nodelay
     pub fn opt_nodelay(&mut self, nodelay: bool) -> &mut Self {
-        self.opts
-            .insert("nodelay".to_owned(), OptionValue::BOOL(nodelay));
+        self.opts.insert(
+            "nodelay".to_owned(),
+            OptionValue::BOOL(nodelay),
+        );
         self
     }
 
     pub fn opt_keep_alive_ms(&mut self, keep_alive: usize) -> &mut Self {
-        self.opts
-            .insert("keep_alive".to_owned(), OptionValue::NUMBER(keep_alive));
+        self.opts.insert(
+            "keep_alive".to_owned(),
+            OptionValue::NUMBER(keep_alive),
+        );
         self
     }
 
     pub fn opt_recv_buf_size(&mut self, buf_size: usize) -> &mut Self {
-        self.opts
-            .insert("recv_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self.opts.insert(
+            "recv_buf_size".to_owned(),
+            OptionValue::NUMBER(buf_size),
+        );
         self
     }
 
     pub fn opt_send_buf_size(&mut self, buf_size: usize) -> &mut Self {
-        self.opts
-            .insert("send_buf_size".to_owned(), OptionValue::NUMBER(buf_size));
+        self.opts.insert(
+            "send_buf_size".to_owned(),
+            OptionValue::NUMBER(buf_size),
+        );
         self
     }
 
@@ -148,13 +139,18 @@ impl Acceptor {
         self
     }
 
-    /// *NOT IMPLEMENT YET*
+    ///
     pub fn terminate(&mut self) {
-        //need ref of eventloop_group
+        self.stopped.store(true, Ordering::Relaxed);
+        if let Some(ref group) = &self.eventloop_group {
+            group.iter().for_each(|g| { g.shutdown(); });
+        }
     }
 
+    pub fn await(&mut self) {}
+
     /// start the server
-    pub fn accept(&self) {
+    pub fn accept(&mut self) {
         let group = match &self.eventloop_group {
             None => panic!(""),
             Some(g) => Arc::clone(&g),
@@ -166,6 +162,7 @@ impl Acceptor {
         let ready_handler = Arc::clone(&self.ready_handler);
         let close_handler = Arc::clone(&self.close_handler);
         let opts = self.opts.clone();
+        let stopped = Arc::clone(&self.stopped);
         let t = thread::spawn(move || {
             let mut events = Events::with_capacity(1024);
             let mut ch_id: usize = 1;
@@ -174,7 +171,7 @@ impl Acceptor {
             sel.register(&listener, Token(0), Ready::readable(), PollOpt::edge())
                 .unwrap();
             group.iter().for_each(|e| e.run());
-            loop {
+            while !stopped.load(Ordering::Relaxed) {
                 match sel.poll(&mut events, None) {
                     Ok(_) => {}
                     Err(_) => {
@@ -202,7 +199,6 @@ impl Acceptor {
                 }
             }
         });
-        t.join();
     }
 
     #[inline]

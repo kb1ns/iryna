@@ -49,26 +49,22 @@ impl EventLoop {
                 selector.poll(&mut events, None).unwrap();
                 for e in events.iter() {
                     if let Some(mut ch) = channels.remove(&e.token()) {
-                        {
-                            //TODO the same with user-config
-                            let mut buf: Vec<u8> = Vec::with_capacity(4096);
-                            match ch.ctx.read(&mut buf) {
-                                Ok(0) => {
-                                    println!("close by remote peer.");
-                                    ch.ctx.close();
-                                }
-                                Ok(n) => {
-                                }
-                                Err(e) => {
-                                }
+                        //TODO the same with user-config
+                        let mut buf: Vec<u8> = Vec::with_capacity(4096);
+                        match ch.read(&mut buf) {
+                            Ok(0) => {
+                                println!("close by remote peer.");
+                                ch.ctx.close();
                             }
-                            if !ch.ctx.is_closed() {
-                                let on_receive = &ch.receive_handler;
-                                on_receive(&mut ch.ctx, buf);
-                            } else {
-                                let on_close = &ch.close_handler;
-                                on_close(&mut ch.ctx);
-                            }
+                            Ok(n) => {}
+                            Err(e) => {}
+                        }
+                        if !ch.ctx.is_closed() {
+                            let on_receive = &ch.receive_handler;
+                            on_receive(&mut ch.ctx, buf);
+                        } else {
+                            let on_close = &ch.close_handler;
+                            on_close(&mut ch.ctx);
                         }
                         if !ch.ctx.is_closed() {
                             //TODO CAUTION

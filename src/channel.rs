@@ -52,6 +52,10 @@ impl Channel {
             PollOpt::edge(),
         );
     }
+
+    pub fn read(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
+        self.ctx.chan.read_to_end(buf)
+    }
 }
 
 pub struct ChanCtx {
@@ -72,42 +76,54 @@ impl ChanCtx {
         let ch = stream.try_clone().unwrap();
         for (k, ref v) in opts.iter() {
             match k.as_ref() {
-                "ttl" => match v {
-                    OptionValue::NUMBER(ttl) => {
-                        ch.set_ttl(*ttl as u32);
+                "ttl" => {
+                    match v {
+                        OptionValue::NUMBER(ttl) => {
+                            ch.set_ttl(*ttl as u32);
+                        }
+                        OptionValue::BOOL(_) => {}
                     }
-                    OptionValue::BOOL(_) => {}
-                },
-                "linger" => match v {
-                    OptionValue::NUMBER(linger) => {
-                        ch.set_linger(Some(Duration::from_millis(*linger as u64)));
+                }
+                "linger" => {
+                    match v {
+                        OptionValue::NUMBER(linger) => {
+                            ch.set_linger(Some(Duration::from_millis(*linger as u64)));
+                        }
+                        OptionValue::BOOL(_) => {}
                     }
-                    OptionValue::BOOL(_) => {}
-                },
-                "nodelay" => match v {
-                    OptionValue::NUMBER(_) => {}
-                    OptionValue::BOOL(b) => {
-                        ch.set_nodelay(*b);
+                }
+                "nodelay" => {
+                    match v {
+                        OptionValue::NUMBER(_) => {}
+                        OptionValue::BOOL(b) => {
+                            ch.set_nodelay(*b);
+                        }
                     }
-                },
-                "keep_alive" => match v {
-                    OptionValue::NUMBER(keepalive) => {
-                        ch.set_keepalive(Some(Duration::from_millis(*keepalive as u64)));
+                }
+                "keep_alive" => {
+                    match v {
+                        OptionValue::NUMBER(keepalive) => {
+                            ch.set_keepalive(Some(Duration::from_millis(*keepalive as u64)));
+                        }
+                        OptionValue::BOOL(_) => {}
                     }
-                    OptionValue::BOOL(_) => {}
-                },
-                "recv_buf_size" => match v {
-                    OptionValue::NUMBER(bufsize) => {
-                        ch.set_recv_buffer_size(*bufsize);
+                }
+                "recv_buf_size" => {
+                    match v {
+                        OptionValue::NUMBER(bufsize) => {
+                            ch.set_recv_buffer_size(*bufsize);
+                        }
+                        OptionValue::BOOL(_) => {}
                     }
-                    OptionValue::BOOL(_) => {}
-                },
-                "send_buf_size" => match v {
-                    OptionValue::NUMBER(bufsize) => {
-                        ch.set_send_buffer_size(*bufsize);
+                }
+                "send_buf_size" => {
+                    match v {
+                        OptionValue::NUMBER(bufsize) => {
+                            ch.set_send_buffer_size(*bufsize);
+                        }
+                        OptionValue::BOOL(_) => {}
                     }
-                    OptionValue::BOOL(_) => {}
-                },
+                }
                 _ => {}
             }
         }
@@ -130,11 +146,6 @@ impl ChanCtx {
 
     pub fn write(&mut self, data: &[u8]) -> Result<()> {
         self.chan.write_all(data)
-    }
-
-    //TODO change to private method
-    pub fn read(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
-        self.chan.read_to_end(buf)
     }
 
     pub fn chan_id(&self) -> Token {
